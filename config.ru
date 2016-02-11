@@ -4,14 +4,14 @@ class API < Grape::API
   format :json
 
   get do
-    if_modified_since = Time.parse(headers['If-Modified-Since']) if headers.key?('If-Modified-Since') rescue nil
-    if if_modified_since && @@last_modified && if_modified_since <= @@last_modified
+    etag = headers['If-None-Match']
+    if etag && @@etag && etag == @@etag
       body false
       status :not_modified
     else
-      @@last_modified ||= Time.now.utc
+      @@etag ||= SecureRandom.hex(12)
       header 'Cache-Control', "private,max-age=0,must-revalidate"
-      header 'Last-Modified', CGI.rfc1123_date(@@last_modified)
+      header 'E-Tag', @@etag
       { count: 1 }
     end
   end

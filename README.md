@@ -89,4 +89,19 @@ $ curl localhost:9292 -H "If-Modified-Since:"
 
 Note that the time granularity here is in seconds, so it's not going to work for a counter.
 
+### If-None-Match
+
+```ruby
+etag = headers['If-None-Match']
+if etag && @@etag && etag == @@etag
+  body false
+  status :not_modified
+else
+  @@etag ||= SecureRandom.hex(12)
+  header 'Cache-Control', "private,max-age=0,must-revalidate"
+  header 'E-Tag', @@etag
+  { count: 1 }
+end
+```
+
 
