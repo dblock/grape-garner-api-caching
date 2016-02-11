@@ -4,15 +4,16 @@ class API < Grape::API
   format :json
 
   get do
-    # private = this user only
-    # max-age = don't store
-    # must-revalidate = don't serve when server is down
-    header 'Cache-Control', "private,max-age=0,must-revalidate"
-
-    # Nirvana was on top of the charts on January 1st, 1990
-    header 'Expires', 'Fri, 01 Jan 1990 00:00:00 GMT'
-
-    { count: 1 }
+    if_modified_since = Time.parse(headers['If-Modified-Since']) if headers.key?('If-Modified-Since') rescue nil
+    if if_modified_since && @@last_modified && if_modified_since <= @@last_modified
+      body false
+      status :not_modified
+    else
+      @@last_modified ||= Time.now.utc
+      header 'Cache-Control', "private,max-age=0,must-revalidate"
+      header 'Last-Modified', CGI.rfc1123_date(@@last_modified)
+      { count: 1 }
+    end
   end
 end
 
