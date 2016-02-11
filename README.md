@@ -115,6 +115,25 @@ use Rack::ETag
 
 Curl once, note the `ETag` and curl again with `If-None-Match: W/"..."`.
 
-Note that this still fetches the data, just avoids sending it.
+Note that this still fetches the data, just avoids sending it. Add a `sleep 3` into the API method to demonstrate.
 
+### Cache Data
+
+Use Cachy, add `gem 'cachy'` to Gemfile.
+
+```ruby
+require 'active_support'
+require 'cachy'
+
+Cachy.cache_store = ActiveSupport::Cache::MemoryStore.new
+```
+
+The API caches the value.
+
+```ruby
+Cachy.cache 'count' do
+  sleep 3
+  { count: 1 }
+end
+```
 
