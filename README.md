@@ -104,4 +104,17 @@ else
 end
 ```
 
+### Rack::Cache and Rack::Etag
+
+Add `rack-cache` to `Gemfile` and `use` in config.ru.
+
+```ruby
+use Rack::Cache
+use Rack::ETag
+```
+
+Curl once, note the `ETag` and curl again with `If-None-Match: W/"..."`.
+
+Note that this still fetches the data, just avoids sending it.
+
 
