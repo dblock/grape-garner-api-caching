@@ -1,0 +1,9 @@
+development:
+  clients:
+    default:
+      database: grape_garner_api_caching
+      hosts:
+        - 127.0.0.1:27017
+  options:
+    raise_not_found_error: false
+    use_utc: true

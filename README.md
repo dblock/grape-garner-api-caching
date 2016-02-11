@@ -158,3 +158,153 @@ get do
   end
 end
 ```
+
+### Problems
+
+#### Object relationships.
+
+```ruby
+# a widget that returns the gadget it belongs to
+get 'widget/:widget_id' do
+  cache(bind: [ Widget, id: params[:widget_id]], Gadget) do
+    Widget.find(params[:widget_id])
+  end
+end
+```
+
+```ruby
+after_save :invalidate_cache
+
+def invalidate_cache
+  cache.invalidate(Gadget)
+  cache.invalidate([Widget, self.id])
+end
+```
+
+#### Role-Based Access
+
+```ruby
+cache(bind: ..., partition_by: :role) do
+  error! 401, 'Access Denied' unless current_user.is_admin?
+end
+```
+
+### Garner
+
+Means to collect things from all over the place.
+
+https://github.com/artsy/garner
+
+Add `garner` to Gemfile.
+
+```ruby
+require 'grape'
+require 'garner'
+require "garner/mixins/rack"
+require 'active_support'
+
+Garner.configure do |config|
+  config.cache = ActiveSupport::Cache::MemoryStore.new
+end
+
+class API < Grape::API
+  helpers Garner::Mixins::Rack
+
+  format :json
+
+  get do
+    garner do
+      sleep 3
+      { count: 1 }
+    end
+  end
+end
+
+run API
+```
+
+### Binding to Models
+
+```ruby
+require 'grape'
+require 'mongoid'
+require 'garner'
+require "garner/mixins/mongoid"
+require "garner/mixins/rack"
+require 'active_support'
+
+Garner.configure do |config|
+  config.cache = ActiveSupport::Cache::MemoryStore.new
+  config.binding_key_strategy = Garner::Strategies::Binding::Key::BindingIndex
+  config.binding_invalidation_strategy = Garner::Strategies::Binding::Invalidation::BindingIndex
+end
+
+Mongoid.load! 'mongoid.yml', 'development'
+
+class Widget
+  include Mongoid::Document
+  include Garner::Mixins::Mongoid::Document
+end
+
+class API < Grape::API
+  helpers Garner::Mixins::Rack
+
+  format :json
+
+  get ':id' do
+    garner.bind(Widget.identify(params[:id])) do
+      Widget.find(params[:id]) || error!('Not Found', 404)
+    end
+  end
+
+  delete ':id' do
+    widget = Widget.find(params[:id]) || error!('Not Found', 404)
+    widget.destroy
+    widget
+  end
+
+  get do
+    garner.bind(Widget) do
+      sleep 2
+      Widget.all.as_json
+    end
+  end
+
+  post do
+    Widget.create!
+  end
+end
+
+run API
+```
+
+#### Rails and Russian Doll Caching
+
+See http://edgeguides.rubyonrails.org/caching_with_rails.html.
+
+```erb
+<% @products.each do |product| %>
+  <% cache product do %>
+    <%= render product %>
+  <% end %>
+<% end %>
+```
+
+Cache key is `product_id` + timestamp + view hash, eg. `views/products/1-201505056193031061005000/bea67108094918eeba42cd4a6e786901`.
+
+```erb
+<% cache product do %>
+  <%= render product.games %>
+<% end %>
+```
+
+```ruby
+class Product < ApplicationRecord
+  has_many :games
+end
+
+class Game < ApplicationRecord
+  belongs_to :product, touch: true
+end
+```
+

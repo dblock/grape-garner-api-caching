@@ -1,34 +1,50 @@
 require 'grape'
-require 'rack/cache'
-
+require 'mongoid'
+require 'garner'
+require "garner/mixins/mongoid"
+require "garner/mixins/rack"
 require 'active_support'
-require 'cachy'
 
-Cachy.cache_store = ActiveSupport::Cache::MemoryStore.new
+Garner.configure do |config|
+  config.cache = ActiveSupport::Cache::MemoryStore.new
+  config.binding_key_strategy = Garner::Strategies::Binding::Key::BindingIndex
+  config.binding_invalidation_strategy = Garner::Strategies::Binding::Invalidation::BindingIndex
+end
+
+Mongoid.load! 'mongoid.yml', 'development'
+
+class Widget
+  include Mongoid::Document
+  include Garner::Mixins::Mongoid::Document
+end
 
 class API < Grape::API
+  helpers Garner::Mixins::Rack
+
   format :json
 
-  helpers do
-    def key(name)
-      options = {}
-      options[:version] = version
-      options[:path] = request.path
-      options[:params] = request.GET
-      puts options.to_json
-      Digest::MD5.hexdigest(options.to_json)
+  get ':id' do
+    garner.bind(Widget.identify(params[:id])) do
+      Widget.find(params[:id]) || error!('Not Found', 404)
     end
+  end
+
+  delete ':id' do
+    widget = Widget.find(params[:id]) || error!('Not Found', 404)
+    widget.destroy
+    widget
   end
 
   get do
-    Cachy.cache key('count') do
-      sleep 3
-      { count: 1 }
+    garner.bind(Widget) do
+      sleep 2
+      Widget.all.as_json
     end
   end
-end
 
-use Rack::Cache
-use Rack::ETag
+  post do
+    Widget.create!
+  end
+end
 
 run API
